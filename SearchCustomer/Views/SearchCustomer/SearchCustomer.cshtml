@@ -1,0 +1,621 @@
+﻿
+@{
+    ViewBag.Title = "SearchCustomer";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<script>
+    $(document).ready(function () {
+
+        $("#CUST_ID").focus();
+
+        // Btn hidden
+        $("#decodeBtn").hide();
+        $("#resetBtn").hide();
+        $("#addCustomertBtn").hide();
+
+        // Div hidden
+        $("#div_custData").hide();
+        $("#div_acctList").hide();
+
+        $("#searchBtn").click(function () {
+            var CUST_ID = $("#CUST_ID").val();
+            var CONTACT_TEL = $("#CONTACT_TEL").val();
+            var EQUIP_NBR = $("#EQUIP_NBR").val();
+            var SIMCARDNO = $("#SIMCARDNO").val();
+
+            //處理空查詢
+            if (CUST_ID == '' && CONTACT_TEL == '' && EQUIP_NBR == '' && SIMCARDNO == '') {
+                $("#errormsg").html("請輸入查詢資料");
+                $("#modal_searchError").modal('show');
+            }
+            else {
+                let req = {
+                    CUST_ID: CUST_ID,
+                    CONTACT_TEL: CONTACT_TEL,
+                    EQUIP_NBR: EQUIP_NBR,
+                    SIMCARDNO: SIMCARDNO
+                }
+                $.ajax({
+                    method: 'post',
+                    url: "@Url.Action("Customer", "SearchCustomer")",
+                    async: false,
+                    data: req
+                }).done(function (res) {
+
+                    $("#resetBtn").show();
+
+                    //res.SYSMSG_CD_ITM_NM = ErrorMessage
+                    if (res.IsModelState == false || res.SYSMSG_CD_ITM_NM != null) {
+                        $("#errormsg").html(res.SYSMSG_CD_ITM_NM + "<br>" + res.ModelStateMSG);
+                        $("#modal_searchError").modal('show');
+                        $("#addCustomertBtn").show();
+                    }
+                    else {
+                        //--- 查詢後清空欄位資料
+                        $("#CUST_ID").val('');
+                        $("#CONTACT_TEL").val('');
+                        $("#EQUIP_NBR").val('');
+                        $("#SIMCARDNO").val('');
+                        $("#CUST_ID").focus();
+
+                        $("#CUST_ID_DATA").val(res.CUST_ID);
+                        $("#CUST_NM_DATA").val(res.CUST_NM);
+                        $("#CUST_ADDRESS_DATA").val(res.CUST_CITY + res.CUST_DISTRICT + res.CUST_VILIAGE + res.CUST_ADDRESS);
+                        if (res.SELL_IND == "1") {
+                            $("#SELL_IND_1").prop("checked", true);
+                        }
+                        else if (res.SELL_IND == "0") {
+                            $("#SELL_IND_0").prop("checked", true);
+                        }
+                        if (res.APPL_NUM != null) {
+                            $("#accttitle").html("帳戶 申請書處理中(" + res.APPL_NUM + ")");
+                            $("#addacct").prop("disabled", true);
+                        }
+                        else{
+                            $("#accttitle").html("帳戶");
+                        }
+                        $("#div_custData").show();
+                        $("#addCustomertBtn").hide();
+                        $("#decodeBtn").show();
+
+                        //AccountTable
+                        $("#accttable").DataTable({
+                            //destroy: Destroy an existing table and create a new one)
+                            destroy: true,
+                            lengthMenu: [5, 10],
+                            //disable ordering on the first column
+                            columnDefs: [
+                                { orderable: false, targets: 0 }
+                            ],
+                            ajax: {
+                                url: "@Url.Action("Account", "SearchCustomer")",
+                                type: 'post',
+                            },
+                            columns: [
+                                {
+                                    'data': 'ACCT_NO', 'render': function (data) {
+                                        return `<a href="javascript:void(0)" id="Detail_Modal_a" data-toggle="modal" data-target="#Detail_Modal" onclick="DetailFunction(\`` + data + `\`)"> 檢視</a> |
+                                                <a href="javascript:void(0)" id="apply" onclick="ApplyFunction(\``+ data +`\`)">申請業務</a> |
+                                               `
+                                    }
+                                },
+                                { 'data': 'ACCT_NO' },
+                                { 'data': 'ACCT_CUST_ID' },
+                                { 'data': 'ACCT_NM' },
+                                { 'data': 'ACCT_ADDRESS_Format' },
+                                { 'data': 'ACCT_CYCLE' },
+                            ]
+
+                        });
+                        $("#div_acctList").show();
+
+                    }
+                }).fail(function (ex) {
+                    //console.log(ex);
+                })
+
+            }
+        })
+
+        $("#decodeBtn").click(function () {
+            $("#modal_Decode").modal('show');
+        })
+
+        $("#decode").click(function () {
+            var verify = $("#authtication").val();
+            $.ajax({
+                method: 'post',
+                url: "@Url.Action("Decode", "SearchCustomer")",
+                async: false,
+                data: { verify: verify }
+            }).done(function (res) {
+                $("#modal_Decode").modal('hide');
+                if (res[0].IsDecode == false) {
+                    //解碼驗證錯誤
+                    $("#modal_Decode").modal('hide');
+                    $("#errormsg").html(res[0].ERROR_MSG);
+                    $("#modal_searchError").modal('show');
+                }
+                else {
+                    //解碼成功
+                    $("#modal_searchSuccess").modal('show');
+                    $("#CUST_ID_DATA").val(res[0].CUST_ID);
+                    $("#CUST_NM_DATA").val(res[0].CUST_NM);
+                    $("#CUST_ADDRESS_Format").val(res[0].CUST_ADDRESS_Format);
+                    $("#decodeBtn").prop("disabled", true);
+                }
+            }).fail(function (ex) {
+            })
+        })
+
+        $("#addacct").click(function () {
+            window.location.href = "@Url.Action("Application", "Application")";
+        })
+
+        $("#addCustomertBtn").click(function () {
+            window.location.href = "@Url.Action("Application", "Application")";
+        })
+
+        //--- 重新查詢Btn .click
+        $("#resetBtn").click(function () {
+            $.ajax({
+                method: 'post',
+                url: "@Url.Action("SetReload", "SearchCustomer")",
+                async: false,
+            }).done(function (res) {
+                if (res == "OK") {
+                    window.location.reload();
+                }
+            }).fail(function () {
+            })
+        })
+
+
+    })
+</script>
+
+<script>
+    //JavaScript function
+        function DetailFunction(val)
+        {
+            $.ajax({
+                method: 'post',
+                url: "@Url.Action("AccountDetail", "SearchCustomer")",
+                async: false,
+                data: { ACCT_NO: val }
+            }).done(function (res) {
+                $("#CUST_TYPE_Format").val(res.CUST_TYPE_Format);
+                $("#LICENSE_NUM").val(res.LICENSE_NUM);
+                $("#REP_NM").val(res.REP_NM);
+                $("#CUST_LVL_Format").val(res.CUST_LVL_Format);
+                $("#ACCT_CUST_ID").val(res.ACCT_CUST_ID);
+                $("#ACCT_NM").val(res.ACCT_NM);
+                $("#ACCT_ADDRESS_Fromat").val(res.ACCT_ADDRESS_Fromat);
+                $("#CONTACT_NM").val(res.CONTACT_NM);
+                $("#CONTACT_TEL_DATA").val(res.CONTACT_TEL);
+                $("#EMAIL").val(res.EMAIL);
+                $("#FAX").val(res.FAX);
+                $("#ORD_INST_CD_Format").val(res.ORD_INST_CD_Format);
+                $("#ACCT_CYCLE").val(res.ACCT_CYCLE);
+                $("#TAXFREE_CARDNUM").val(res.TAXFREE_CARDNUM);
+                $("#TAXFREE_END_DT_Format").val(res.TAXFREE_END_DT_Format);
+                $("#AGENT_NM").val(res.AGENT_NM);
+                $("#AGENT_TEL").val(res.AGENT_TEL);
+                $("#AGENT_ADDRESS_Formet").val(res.AGENT_ADDRESS_Formet);
+            }).fail(function (ex) {
+            })
+
+            $("#deviceTable").DataTable({
+                //destroy: Destroy an existing table and create a new one)
+                destroy: true,
+                lengthMenu: [5, 10],
+                ajax: {
+                    url: "@Url.Action("Device", "SearchCustomer")",
+                    type: 'post',
+                    data: { ACCT_NO: val }
+                },
+                columns: [
+                    { 'data': 'INDEX' },
+                    { 'data': 'CARI_CD_Format' },
+                    { 'data': 'SVC_CD_Format' },
+                    { 'data': 'EQUIP_NBR' },
+                    { 'data': 'EQUIP_PPID_Format' },
+                    { 'data': 'ACCT_NUM' },
+                    { 'data': 'START_DT_Format' },
+                    { 'data': 'END_DT_Format' }
+                ]
+            })
+
+        }
+
+        function ApplyFunction(val)
+        {
+            window.location.href = "@Url.Action("Application", "Application")";
+        }
+</script>
+
+<h2>客戶查詢</h2>
+
+<div class="card-body">
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="control-label">身份證號/統一編號</label>
+            <div>
+                <input id="CUST_ID" class="form-control text-box single-line" />
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="control-label">電話</label>
+            <div>
+                <input id="CONTACT_TEL" class="form-control text-box single-line" />
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="control-label">門號</label>
+            <div>
+                <input id="EQUIP_NBR" class="form-control text-box single-line" />
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="control-label">卡號</label>
+            <div>
+                <input id="SIMCARDNO" class="form-control text-box single-line" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!--searchBtn Start-->
+<div class="row">
+    <div class="col-md-12">
+        <div class="form-group">
+            <div class="row justify-content-center">
+                <button type="button" id="searchBtn" class="btn btn-primary btn-lg">查詢</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--searchBtn End-->
+<!--Modal search Success Start-->
+<div>
+    <div class="modal fade" id="modal_searchSuccess" style="z-index: 10000;">
+        <div class="modal-dialog">
+            <div class="modal-content d-flex">
+                <div class="card-body">
+                    <div aria-labelledby="swal2-title" aria-describedby="swal2-html-container" class="swal2-popup swal2-modal swal2-icon-success swal2-show" tabindex="-1" role="dialog" aria-live="assertive" aria-modal="true" style="display: grid;">
+                        <button type="button" class="swal2-close" aria-label="Close this dialog" style="display: none;">×</button>
+                        <div class="swal2-icon swal2-success swal2-icon-show" style="display: flex;">
+                            <div class="swal2-success-circular-line-left" style="background-color: rgb(255, 255, 255);"></div>
+                            <span class="swal2-success-line-tip"></span> <span class="swal2-success-line-long"></span>
+                            <div class="swal2-success-ring"></div><div class="swal2-success-fix" style="background-color: rgb(255, 255, 255);"></div>
+                            <div class="swal2-success-circular-line-right" style="background-color: rgb(255, 255, 255);"></div>
+                        </div><img class="swal2-image" style="display: none;">
+                        <h2 class="swal2-title" id="swal2-title" style="display: block;">驗證成功</h2><br />
+                        <button type="button" class="swal2-confirm swal2-styled" aria-label="" control-id="ControlID-40" style="display: inline-block;" data-dismiss="modal" id="decode_ok_btn">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--Modal search Success End-->
+<!--Modal search Error Start-->
+<div>
+    <div class="modal fade" id="modal_searchError" style="z-index: 10000;">
+        <div class="modal-dialog">
+            <div class="modal-content d-flex">
+                <div class="card-body">
+                    <div aria-labelledby="swal2-title" aria-describedby="swal2-html-container" class="swal2-popup swal2-modal swal2-icon-error swal2-show" tabindex="-1" role="dialog" aria-live="assertive" aria-modal="true" style="display: grid;">
+                        <button type="button" class="swal2-close" aria-label="Close this dialog" style="display: none;">×</button>
+                        <div class="swal2-icon swal2-error swal2-icon-show" style="display: flex;">
+                            <span class="swal2-x-mark">
+                                <span class="swal2-x-mark-line-left"></span>
+                                <span class="swal2-x-mark-line-right"></span>
+                            </span>
+                        </div><img class="swal2-image" style="display: none;">
+                        <h2 class="swal2-title" id="errormsg" style="display: block;"></h2><br /> <!--顯示錯誤訊息-->
+                        <div class="swal2-html-container" id="swal2-html-container" style="display: block;"></div>
+                        <div class="swal2-actions">
+                            <button type="button" class="swal2-confirm swal2-styled" aria-label="" control-id="ControlID-40" style="display: inline-block;" data-dismiss="modal">OK</button><!--離開 Modal Btn-->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--Modal search Error End-->
+<!--Modal Decode Start-->
+<div class="modal fade" id="modal_Decode" style="z-index: 10000;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content d-flex">
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="col-md-12 mb-4">
+                        <label>身份證號(後4碼)</label>
+                        <input id="authtication" name="authtication" maxlength="4" class="form-control" />
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="row justify-content-center">
+                        <button type="button" name="decode" id="decode" class="btn btn-primary" style="float:right">解碼</button> &#160 &#160 &#160
+                        <button type="button" id="escbtn" class="btn btn-danger" data-dismiss="modal">取消</button>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12">
+                    &#160
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--Modal Decode End-->
+<!--CustomerData Start-->
+<div class="card card-default" id="div_custData">
+    <div class="card-header">
+        <h3 class="card-title" id="cust">客戶</h3>
+    </div>
+    <div class="card-body" style="display: block;">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="control-label">身份證號/統一編號</label>
+                <div>
+                    <input id="CUST_ID_DATA" class="form-control text-box single-line" disabled />
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="control-label">用戶名稱</label>
+                <div>
+                    <input id="CUST_NM_DATA" class="form-control text-box single-line" disabled />
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="control-label">地址</label>
+                <div>
+                    <input id="CUST_ADDRESS_DATA" class="form-control text-box single-line" disabled />
+                </div>
+            </div>
+            <div class="col-md-6 mb-3" style="padding:15px">
+                <br />
+                <label class="control-label">行銷註記</label>
+                <input type="radio" class="" id="SELL_IND_1" value="" disabled />
+                <label>同意</label>
+                <input type="radio" class="" id="SELL_IND_0" value="" disabled />
+                <label>不同意</label>
+            </div>
+        </div>
+    </div>
+</div>
+<!--CustomerData End-->
+<!--AcctData Start-->
+<div id="div_acctList">
+    <div class="row">
+        <div class="col-md-12">
+            <button type="button" class="btn btn-primary btn-lg" id="addacct" onclick="">建置新帳戶</button>
+        </div>
+    </div>
+    <div class="card card-default">
+        <div class="card-header">
+            <h3 class="card-title" id="accttitle">帳戶</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-bordered table-striped dataTable dtr-inline" id="accttable" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>動作</th>
+                        <th>帳戶代號</th>
+                        <th>出帳證號</th>
+                        <th>帳戶名稱</th>
+                        <th>帳寄地址</th>
+                        <th>出帳週期</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!--jQuery DataTable-->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<!--AcctData End-->
+<!--檢視 - AccountDetail Modal Start-->
+<div class="modal fade" id="Detail_Modal" style="z-index: 10000;">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content d-flex">
+            <div id="div_Detail">
+                <div class="card card-default">
+                    <div class="card-header">
+                        <h3 class="card-title" id="acct_nbr">帳戶</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">客戶分類</label>
+                                <div>
+                                    <input id="CUST_TYPE_Format" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">證照號碼</label>
+                                <div>
+                                    <input id="LICENSE_NUM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">代表人</label>
+                                <div>
+                                    <input id="REP_NM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">客戶等級</label>
+                                <div>
+                                    <input id="CUST_LVL_Format" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">出帳證號</label>
+                                <div>
+                                    <input id="ACCT_CUST_ID" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">帳戶名稱</label>
+                                <div>
+                                    <input id="ACCT_NM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">帳寄地址</label>
+                                <div>
+                                    <input id="ACCT_ADDRESS_Fromat" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">聯絡人</label>
+                                <div>
+                                    <input id="CONTACT_NM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">聯絡電話</label>
+                                <div>
+                                    <input id="CONTACT_TEL_DATA" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">電子郵件</label>
+                                <div>
+                                    <input id="EMAIL" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">傳真</label>
+                                <div>
+                                    <input id="FAX" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">受理機構</label>
+                                <div>
+                                    <input id="ORD_INST_CD_Format" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">出帳週期</label>
+                                <div>
+                                    <input id="ACCT_CYCLE" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">免稅卡號</label>
+                                <div>
+                                    <input id="TAXFREE_CARDNUM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">免稅卡號截止日期</label>
+                                <div>
+                                    <input id="TAXFREE_END_DT_Format" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">代理人</label>
+                                <div>
+                                    <input id="AGENT_NM" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">代理人電話</label>
+                                <div>
+                                    <input id="AGENT_TEL" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="control-label">代理人地址</label>
+                                <div>
+                                    <input id="AGENT_ADDRESS_Formet" class="form-control text-box single-line" disabled />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--Device Data-->
+                    <div class="card-header">
+                        <h3 class="card-title" id="acct_nbr">設備</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered table-striped dataTable dtr-inline" id="deviceTable" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>序號</th>
+                                    <th>業者種類</th>
+                                    <th>服務種類</th>
+                                    <th>設備(門號)</th>
+                                    <th>月租費PPID</th>
+                                    <th>列帳號碼</th>
+                                    <th>啟用日期</th>
+                                    <th>註銷日期</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!--OK Btn Leave Modal Start-->
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <div class="row justify-content-center">
+                                <button type="button" class="btn btn-primary btn-lg" data-dismiss="modal">OK</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--OK Btn Leave Modal End-->
+            </div>
+        </div>
+    </div>
+</div>
+<!--檢視 - AccountDetail Modal End-->
+
+<!--Btn Start-->
+<div id="div_Btn">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="form-group">
+                <div class="row justify-content-center">
+                    <button type="button" id="resetBtn" class="btn btn-primary btn-lg">重新查詢</button> &#160 &#160 &#160
+                    <button type="button" id="decodeBtn" class="btn btn-primary btn-lg">解碼</button> &#160 &#160 &#160
+                    <button type="button" id="addCustomertBtn" class="btn btn-primary btn-lg">建置新客戶</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--Btn End-->
